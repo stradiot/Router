@@ -17,12 +17,13 @@ public:
     void print();
     void set_timer(unsigned int value);
     void set_stop(bool value);
+    HWAddress<6>* findRecord(IPv4Address targetIP);
     void clear();
 
 private:
     QList<ARP_record> records;
     bool stop = false;
-    unsigned int timer = 30;
+    unsigned int timer = 20;
     QMutex mutex;
 
 signals:

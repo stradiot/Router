@@ -22,6 +22,7 @@
 #include <QtWidgets/QMainWindow>
 #include <QtWidgets/QMenuBar>
 #include <QtWidgets/QPushButton>
+#include <QtWidgets/QSpinBox>
 #include <QtWidgets/QStatusBar>
 #include <QtWidgets/QToolBar>
 #include <QtWidgets/QWidget>
@@ -44,7 +45,6 @@ public:
     QComboBox *comboBox_2;
     QLineEdit *lineEdit_3;
     QLineEdit *lineEdit_4;
-    QLineEdit *lineEdit_5;
     QLabel *label_4;
     QLabel *label_5;
     QLabel *label_6;
@@ -53,8 +53,13 @@ public:
     QPushButton *pushButton_3;
     QPushButton *pushButton_4;
     QPushButton *pushButton_5;
-    QPushButton *pushButton_6;
+    QGroupBox *groupBox_4;
     QListView *listView;
+    QSpinBox *spinBox;
+    QLabel *label_7;
+    QPushButton *pushButton_6;
+    QLineEdit *lineEdit_5;
+    QPushButton *pushButton_7;
     QMenuBar *menuBar;
     QToolBar *mainToolBar;
     QStatusBar *statusBar;
@@ -129,15 +134,31 @@ public:
         pushButton_5 = new QPushButton(groupBox_3);
         pushButton_5->setObjectName(QStringLiteral("pushButton_5"));
         pushButton_5->setGeometry(QRect(30, 150, 91, 27));
-        pushButton_6 = new QPushButton(Gui);
-        pushButton_6->setObjectName(QStringLiteral("pushButton_6"));
-        pushButton_6->setGeometry(QRect(900, 150, 90, 27));
-        lineEdit_5 = new QLineEdit(Gui);
-        lineEdit_5->setObjectName(QStringLiteral("lineEdit_5"));
-        lineEdit_5->setGeometry(QRect(1000, 150, 150, 23));
-        listView = new QListView(centralWidget);
+        groupBox_4 = new QGroupBox(centralWidget);
+        groupBox_4->setObjectName(QStringLiteral("groupBox_4"));
+        groupBox_4->setGeometry(QRect(660, 210, 301, 401));
+        groupBox_4->setAlignment(Qt::AlignCenter);
+        listView = new QListView(groupBox_4);
         listView->setObjectName(QStringLiteral("listView"));
-        listView->setGeometry(QRect(660, 210, 341, 401));
+        listView->setGeometry(QRect(0, 110, 301, 291));
+        spinBox = new QSpinBox(groupBox_4);
+        spinBox->setObjectName(QStringLiteral("spinBox"));
+        spinBox->setGeometry(QRect(140, 20, 71, 33));
+        spinBox->setMinimum(1);
+        spinBox->setMaximum(200);
+        spinBox->setValue(20);
+        label_7 = new QLabel(groupBox_4);
+        label_7->setObjectName(QStringLiteral("label_7"));
+        label_7->setGeometry(QRect(20, 20, 111, 31));
+        pushButton_6 = new QPushButton(groupBox_4);
+        pushButton_6->setObjectName(QStringLiteral("pushButton_6"));
+        pushButton_6->setGeometry(QRect(20, 70, 91, 27));
+        lineEdit_5 = new QLineEdit(groupBox_4);
+        lineEdit_5->setObjectName(QStringLiteral("lineEdit_5"));
+        lineEdit_5->setGeometry(QRect(140, 70, 141, 23));
+        pushButton_7 = new QPushButton(groupBox_4);
+        pushButton_7->setObjectName(QStringLiteral("pushButton_7"));
+        pushButton_7->setGeometry(QRect(220, 20, 71, 31));
         Gui->setCentralWidget(centralWidget);
         menuBar = new QMenuBar(Gui);
         menuBar->setObjectName(QStringLiteral("menuBar"));
@@ -172,7 +193,10 @@ public:
         pushButton_3->setText(QApplication::translate("Gui", "Start", Q_NULLPTR));
         pushButton_4->setText(QApplication::translate("Gui", "Stop", Q_NULLPTR));
         pushButton_5->setText(QApplication::translate("Gui", "Quit", Q_NULLPTR));
+        groupBox_4->setTitle(QApplication::translate("Gui", "ARP table", Q_NULLPTR));
+        label_7->setText(QApplication::translate("Gui", "Set ARP timer", Q_NULLPTR));
         pushButton_6->setText(QApplication::translate("Gui", "Request", Q_NULLPTR));
+        pushButton_7->setText(QApplication::translate("Gui", "Clear", Q_NULLPTR));
     } // retranslateUi
 
 };

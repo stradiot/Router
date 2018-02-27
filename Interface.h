@@ -18,6 +18,7 @@ public:
     string getInterface();
 
     void sendARPrequest(IPv4Address targetIP);
+    void sendPING(IPv4Address targetIP);
 
 private:
     NetworkInterface* interface;
@@ -37,7 +38,8 @@ private:
     void processPDU(PDU* pdu);
     void sendARPreply(ARP* request);
     void processARP(ARP* arp);
-
+    void processPING(ICMP* icmp);
+    void sendPINGreply(PDU* pdu);
 };
 
 

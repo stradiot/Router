@@ -94,3 +94,18 @@ void ARP_table::clear() {
 ARP_table::ARP_table(QObject *parent) : QThread(parent) {
 
 }
+
+HWAddress<6>* ARP_table::findRecord(IPv4Address targetIP) {
+    auto* targetMAC = new HWAddress<6>;
+
+    int recordCount = this->records.count();
+    for (int i = 0; i < recordCount; ++i) {
+        ARP_record act = this->records.at(i);
+        if (act.getIP() == targetIP){
+            *targetMAC = act.getMAC();
+            return targetMAC;
+        }
+    }
+
+    return nullptr;
+}

@@ -2,7 +2,6 @@
 #include "ui_Gui.h"
 #include <QtWidgets/QMessageBox>
 #include <QLayout>
-#include <QtGui/QStandardItemModel>
 #include <iostream>
 
 using namespace Tins;
@@ -22,7 +21,9 @@ Gui::Gui(QWidget *parent) :
 
     ui->comboBox_2->setCurrentText("lo");
 
-    ui->lineEdit_3->setText("1.1.1.1");
+    ui->lineEdit->setText("1.1.1.1");
+    ui->lineEdit_2->setText("255.255.255.0");
+    ui->lineEdit_3->setText("2.2.2.2");
     ui->lineEdit_4->setText("255.255.255.0");
 
     this->model = new QStringListModel(this);
@@ -34,7 +35,6 @@ Gui::Gui(QWidget *parent) :
 
     this->one = new Interface(this->arp_table);
     this->two = new Interface(this->arp_table);
-
 
     connect(arp_table, SIGNAL(printTable(QStringList)), this, SLOT(onARPprint(QStringList)));
 }
@@ -105,5 +105,13 @@ void Gui::on_pushButton_5_clicked() {
 }
 
 void Gui::on_pushButton_6_clicked() {
-    this->one->sendARPrequest(IPv4Address(ui->lineEdit_5->text().toStdString()));
+    this->one->sendPING(ui->lineEdit_5->text().toStdString());
+}
+
+void Gui::on_spinBox_valueChanged(int i) {
+    this->arp_table->set_timer((unsigned int)i);
+}
+
+void Gui::on_pushButton_7_clicked() {
+    this->arp_table->clear();
 }

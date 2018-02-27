@@ -1,6 +1,7 @@
 #include <iostream>
 #include "Interface.h"
 #include <boost/asio.hpp>
+#include <QtWidgets/QMessageBox>
 
 void Interface::run() {
     while (true){
@@ -21,9 +22,6 @@ Interface::Interface(ARP_table* arp_table) {
     this->config.set_direction(PCAP_D_IN);
 
     this->arp_table = arp_table;
-
-    ARP_record* jooj = new ARP_record(IPv4Address("1.1.1.5"), HWAddress<6>("dd:cc:bb"));
-    arp_table->add_record(jooj);
 }
 
 void Interface::setIPv4(string interface, string ipv4, string mask) {
@@ -61,8 +59,11 @@ string Interface::getInterface() {
 
 void Interface::processPDU(PDU *pdu) {
     pdu = pdu->inner_pdu();
-    ARP* arp = pdu->find_pdu<ARP>();
+    auto* arp = pdu->find_pdu<ARP>();
+    auto*  icmp = pdu->find_pdu<ICMP>();
+
     processARP(arp);
+    processPING(icmp);
 }
 
 void Interface::sendARPreply(ARP* request) {
@@ -84,6 +85,7 @@ void Interface::sendARPrequest(IPv4Address targetIP) {
 void Interface::processARP(ARP *arp) {
     if (arp == nullptr)
         return;
+
     if (arp->target_ip_addr().to_string() == this->ipv4->to_string()){
         if (arp->opcode() == ARP::REPLY){
              ARP_record* record = new ARP_record(arp->sender_ip_addr(), arp->sender_hw_addr());
@@ -93,6 +95,74 @@ void Interface::processARP(ARP *arp) {
         }
     }
 }
+
+void Interface::sendPING(IPv4Address targetIP) {
+    PacketSender sender;
+
+    ICMP echo;
+    echo.type(ICMP::ECHO_REQUEST);
+
+    IP ip(targetIP, *this->ipv4);
+
+    HWAddress<6> *targetMAC = this->arp_table->findRecord(targetIP);
+
+    for (int i = 0; i < 5; ++i) {
+        if (targetMAC == nullptr){
+            sendARPrequest(targetIP);
+            sleep(1);
+            targetMAC = this->arp_table->findRecord(targetIP);
+        } else
+            break;
+    }
+
+    if (targetMAC == nullptr){
+        QMessageBox messageBox;
+        messageBox.critical(nullptr,"Error","Destination unreachable\t");
+        return;
+    }
+
+    EthernetII eth(*targetMAC, this->interface->hw_address());
+    eth = eth / ip / echo;
+
+    eth.send(sender, *this->interface);
+}
+
+void Interface::processPING(ICMP *icmp) {
+    if (icmp == nullptr)
+        return;
+
+    PDU* pdu = icmp->parent_pdu()->parent_pdu();
+    IP* ip = pdu->find_pdu<IP>();
+
+    if (ip == nullptr)
+        return;
+
+    if (ip->dst_addr() == this->ipv4->to_string()){
+        if (icmp->type() == ICMP::ECHO_REPLY){
+            QMessageBox messageBox;
+            messageBox.information(nullptr, "PING", "Ping successfull");
+        } else if (icmp->type() == ICMP::ECHO_REQUEST){
+            sendPINGreply(pdu);
+        }
+    }
+}
+
+void Interface::sendPINGreply(PDU *pdu) {
+    auto* reply = pdu->find_pdu<ICMP>()->clone();
+    reply->type(ICMP::ECHO_REPLY);
+
+    auto* ip_request = pdu->find_pdu<IP>();
+    auto* ip_reply = new IP(ip_request->src_addr(), ip_request->dst_addr());
+
+    auto* eth_request = pdu->find_pdu<EthernetII>();
+    auto* eth_reply = new EthernetII(eth_request->src_addr(), this->interface->hw_address());
+
+    *eth_reply = *eth_reply / *ip_reply / *reply;
+
+    PacketSender sender;
+    sender.send(*eth_reply, *this->interface);
+}
+
 
 
 
