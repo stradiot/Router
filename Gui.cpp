@@ -32,6 +32,7 @@ Gui::Gui(QWidget *parent) :
     ui->listView->setModel(model);
 
 
+
     this->arp_table = new ARP_table(this);
     this->arp_table->start();
 
