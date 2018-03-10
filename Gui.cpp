@@ -2,7 +2,6 @@
 #include "ui_Gui.h"
 #include <QtWidgets/QMessageBox>
 #include <QLayout>
-#include <iostream>
 
 using namespace Tins;
 using namespace std;
@@ -27,6 +26,7 @@ Gui::Gui(QWidget *parent) :
     ui->lineEdit_4->setText("255.255.255.0");
 
     ui->pushButton_6->setDisabled(true);
+    ui->pushButton_4->setDisabled(true);
 
     this->model = new QStringListModel(this);
     ui->listView->setModel(model);
@@ -89,12 +89,16 @@ void Gui::on_pushButton_3_clicked() {
 
     this->arp_table->set_stop(false);
     this->arp_table->start();
+    ui->pushButton_4->setDisabled(false);
+    ui->pushButton_3->setDisabled(true);
 }
 
 void Gui::on_pushButton_4_clicked() {
     this->one->setStop(true);
     this->two->setStop(true);
     this->arp_table->set_stop(true);
+    ui->pushButton_3->setDisabled(false);
+    ui->pushButton_4->setDisabled(true);
 }
 
 void Gui::onARPprint(QStringList list) {

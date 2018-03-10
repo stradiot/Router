@@ -54,7 +54,10 @@ void Interface::setStop(bool value) {
 }
 
 string Interface::getInterface() {
-    return this->interface->name();
+    if (this->interface == nullptr)
+        return "none";
+    else
+        return this->interface->name();
 }
 
 void Interface::processPDU(PDU *pdu) {
@@ -103,28 +106,29 @@ void Interface::sendPING(IPv4Address targetIP) {
     echo.type(ICMP::ECHO_REQUEST);
 
     IP ip(targetIP, *this->ipv4);
-
-    HWAddress<6> *targetMAC = this->arp_table->findRecord(targetIP);
-
-    for (int i = 0; i < 5; ++i) {
-        if (targetMAC == nullptr){
-            sendARPrequest(targetIP);
-            sleep(1);
-            targetMAC = this->arp_table->findRecord(targetIP);
-        } else
-            break;
-    }
-
-    if (targetMAC == nullptr){
-        QMessageBox messageBox;
-        messageBox.critical(nullptr,"Error","Destination unreachable\t");
-        return;
-    }
-
-    EthernetII eth(*targetMAC, this->interface->hw_address());
-    eth = eth / ip / echo;
-
-    eth.send(sender, *this->interface);
+    sendPacket(&ip);
+//
+//    HWAddress<6> *targetMAC = this->arp_table->findRecord(targetIP);
+//
+//    for (int i = 0; i < 5; ++i) {
+//        if (targetMAC == nullptr){
+//            sendARPrequest(targetIP);
+//            sleep(1);
+//            targetMAC = this->arp_table->findRecord(targetIP);
+//        } else
+//            break;
+//    }
+//
+//    if (targetMAC == nullptr){
+//        QMessageBox messageBox;
+//        messageBox.critical(nullptr,"Error","Destination unreachable\t");
+//        return;
+//    }
+//
+//    EthernetII eth(*targetMAC, this->interface->hw_address());
+//    eth = eth / ip / echo;
+//
+//    eth.send(sender, *this->interface);
 }
 
 void Interface::processPING(ICMP *icmp) {
@@ -132,7 +136,7 @@ void Interface::processPING(ICMP *icmp) {
         return;
 
     PDU* pdu = icmp->parent_pdu()->parent_pdu();
-    IP* ip = pdu->find_pdu<IP>();
+    auto* ip = pdu->find_pdu<IP>();
 
     if (ip == nullptr)
         return;
@@ -154,13 +158,40 @@ void Interface::sendPINGreply(PDU *pdu) {
     auto* ip_request = pdu->find_pdu<IP>();
     auto* ip_reply = new IP(ip_request->src_addr(), ip_request->dst_addr());
 
-    auto* eth_request = pdu->find_pdu<EthernetII>();
-    auto* eth_reply = new EthernetII(eth_request->src_addr(), this->interface->hw_address());
+//    auto* eth_request = pdu->find_pdu<EthernetII>();
+//    auto* eth_reply = new EthernetII(eth_request->src_addr(), this->interface->hw_address());
+//
+//    *eth_reply = *eth_reply / *ip_reply / *reply;
+//
+//    PacketSender sender;
+//    sender.send(*eth_reply, *this->interface);
+    sendPacket(ip_reply);
+}
 
-    *eth_reply = *eth_reply / *ip_reply / *reply;
-
+void Interface::sendPacket(IP* ip) {
     PacketSender sender;
-    sender.send(*eth_reply, *this->interface);
+
+    HWAddress<6> *targetMAC = this->arp_table->findRecord(ip->dst_addr());
+
+    for (int i = 0; i < 5; ++i) {
+        if (targetMAC == nullptr){
+            sendARPrequest(ip->dst_addr());
+            sleep(1);
+            targetMAC = this->arp_table->findRecord(ip->dst_addr());
+        } else
+            break;
+    }
+
+    if (targetMAC == nullptr){
+        QMessageBox messageBox;
+        messageBox.critical(nullptr,"Error","Destination unreachable\t");
+        return;
+    }
+
+    EthernetII eth(*targetMAC, this->interface->hw_address());
+    eth = eth / *ip;
+
+    eth.send(sender, *this->interface);
 }
 
 

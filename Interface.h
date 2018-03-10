@@ -21,7 +21,7 @@ public:
     void sendPING(IPv4Address targetIP);
 
 private:
-    NetworkInterface* interface;
+    NetworkInterface* interface = nullptr;
     IPv4Address* ipv4 = new IPv4Address;
     IPv4Address* mask = new IPv4Address;
     IPv4Address* broadcast = new IPv4Address;
@@ -39,6 +39,7 @@ private:
     void sendARPreply(ARP* request);
     void processARP(ARP* arp);
     void processPING(ICMP* icmp);
+    void sendPacket(IP* ip);
     void sendPINGreply(PDU* pdu);
 };
 
