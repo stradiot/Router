@@ -26,6 +26,8 @@ Gui::Gui(QWidget *parent) :
     ui->lineEdit_3->setText("2.2.2.2");
     ui->lineEdit_4->setText("255.255.255.0");
 
+    ui->pushButton_6->setDisabled(true);
+
     this->model = new QStringListModel(this);
     ui->listView->setModel(model);
 
@@ -54,6 +56,8 @@ void Gui::on_pushButton_clicked() {
         string mask = ui->lineEdit_2->text().toStdString();
 
         this->one->setIPv4(interface, ip, mask);
+
+        ui->pushButton_6->setDisabled(false);
     }
 }
 

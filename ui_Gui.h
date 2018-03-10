@@ -195,7 +195,7 @@ public:
         pushButton_5->setText(QApplication::translate("Gui", "Quit", Q_NULLPTR));
         groupBox_4->setTitle(QApplication::translate("Gui", "ARP table", Q_NULLPTR));
         label_7->setText(QApplication::translate("Gui", "Set ARP timer", Q_NULLPTR));
-        pushButton_6->setText(QApplication::translate("Gui", "Request", Q_NULLPTR));
+        pushButton_6->setText(QApplication::translate("Gui", "Ping", Q_NULLPTR));
         pushButton_7->setText(QApplication::translate("Gui", "Clear", Q_NULLPTR));
     } // retranslateUi
 

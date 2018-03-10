@@ -140,7 +140,7 @@ void Interface::processPING(ICMP *icmp) {
     if (ip->dst_addr() == this->ipv4->to_string()){
         if (icmp->type() == ICMP::ECHO_REPLY){
             QMessageBox messageBox;
-            messageBox.information(nullptr, "PING", "Ping successfull");
+            messageBox.information(nullptr, "PING", "Ping successful");
         } else if (icmp->type() == ICMP::ECHO_REQUEST){
             sendPINGreply(pdu);
         }
