@@ -4,12 +4,9 @@
 #include "ARP_table.h"
 
 void ARP_table::run() {
-    while (true){
-        if (this->stop)
-            break;
-
+    while (!this->stop){
         this->print();
-        mutex.lock();
+        std::unique_lock<std::mutex> guard(mutex);
         int count = this->records.count();
         if (count == 0){
             mutex.unlock();
@@ -19,7 +16,7 @@ void ARP_table::run() {
 
         int i = 0;
         while (i < count) {
-            ARP_record* act = const_cast<ARP_record *>(&this->records.at(i));
+            auto* act = const_cast<ARP_record *>(&this->records.at(i));
             if (act->getTimer() == 0) {
                 this->records.removeAt(i);
                 count = this->records.count();
@@ -28,7 +25,7 @@ void ARP_table::run() {
                 i++;
             }
         }
-        mutex.unlock();
+        guard.unlock();
         sleep(1);
     }
 }
@@ -36,7 +33,7 @@ void ARP_table::run() {
 void ARP_table::add_record(ARP_record *record) {
     int recordCount = this->records.count();
     for (int i = 0; i < recordCount; ++i) {
-        ARP_record* act = const_cast<ARP_record *>(&this->records.at(i));
+        auto* act = const_cast<ARP_record *>(&this->records.at(i));
 
         if (act->getIP() == record->getIP()) {
             if (act->getMAC() == record->getMAC()) {
@@ -73,26 +70,19 @@ void ARP_table::print() {
 }
 
 void ARP_table::set_timer(unsigned int value) {
-    this->mutex.lock();
+    std::unique_lock<std::mutex> guard(mutex);
     this->timer = value;
-    this->mutex.unlock();
+    guard.unlock();
 }
 
 void ARP_table::set_stop(bool value) {
-    this->mutex.lock();
     this->stop = value;
-    this->mutex.unlock();
 }
 
 void ARP_table::clear() {
-    this->mutex.lock();
+    std::unique_lock<std::mutex> guard(mutex);
     this->records.clear();
-    this->mutex.unlock();
-
-}
-
-ARP_table::ARP_table(QObject *parent) : QThread(parent) {
-
+    guard.unlock();
 }
 
 HWAddress<6>* ARP_table::findRecord(IPv4Address targetIP) {
@@ -108,4 +98,8 @@ HWAddress<6>* ARP_table::findRecord(IPv4Address targetIP) {
     }
 
     return nullptr;
+}
+
+ARP_table::ARP_table(QObject *parent) : QThread(parent) {
+
 }

@@ -4,6 +4,7 @@
 
 #include <QtCore/QThread>
 #include <QtCore/QMutex>
+#include <mutex>
 #include "ARP_record.h"
 
 class ARP_table : public QThread{
@@ -24,7 +25,7 @@ private:
     QList<ARP_record> records;
     bool stop = false;
     unsigned int timer = 20;
-    QMutex mutex;
+    std::mutex mutex;
 
 signals:
     void printTable(QStringList list);

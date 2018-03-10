@@ -2,6 +2,7 @@
 #define ROUTER_INTERFACE_H
 
 #include <tins/tins.h>
+#include <mutex>
 #include "ARP_table.h"
 
 using namespace Tins;
@@ -14,11 +15,10 @@ public:
     explicit Interface(ARP_table* arp_table);
     void setIPv4(string interface, string ipv4, string mask);
     void run() override;
-    void setStop(bool value);
     string getInterface();
 
     void sendARPrequest(IPv4Address targetIP);
-    void sendPING(IPv4Address targetIP);
+    void sendPINGrequest(IPv4Address targetIP);
 
 private:
     NetworkInterface* interface = nullptr;
@@ -28,11 +28,8 @@ private:
 
     ARP_table* arp_table;
 
-    bool stop = true;
     SnifferConfiguration config;
     Sniffer* sniffer = new Sniffer("lo");
-
-    QMutex mutex;
 
     void calculateBroadcast();
     void processPDU(PDU* pdu);

@@ -2,17 +2,12 @@
 #include "Interface.h"
 #include <boost/asio.hpp>
 #include <QtWidgets/QMessageBox>
+#include <QtCore/QFuture>
+#include <QtConcurrent/QtConcurrent>
 
 void Interface::run() {
     while (true){
-        this->mutex.lock();
-        if (this->stop){
-            this->mutex.unlock();
-            break;
-        }
-        PDU *pdu = (*sniffer).next_packet();
-        processPDU(pdu);
-        this->mutex.unlock();
+        processPDU(sniffer->next_packet());
     }
 }
 
@@ -25,7 +20,6 @@ Interface::Interface(ARP_table* arp_table) {
 }
 
 void Interface::setIPv4(string interface, string ipv4, string mask) {
-    mutex.lock();
     delete this->ipv4;
     delete this->mask;
     delete this->sniffer;
@@ -38,7 +32,6 @@ void Interface::setIPv4(string interface, string ipv4, string mask) {
     this->interface = new NetworkInterface(interface);
 
     this->sniffer = new Sniffer(interface, this->config);
-    mutex.unlock();
 }
 
 void Interface::calculateBroadcast() {
@@ -49,10 +42,6 @@ void Interface::calculateBroadcast() {
     this->broadcast = new IPv4Address(broadcast.to_string());
 }
 
-void Interface::setStop(bool value) {
-    this->stop = value;
-}
-
 string Interface::getInterface() {
     if (this->interface == nullptr)
         return "none";
@@ -60,13 +49,16 @@ string Interface::getInterface() {
         return this->interface->name();
 }
 
-void Interface::processPDU(PDU *pdu) {
-    pdu = pdu->inner_pdu();
-    auto* arp = pdu->find_pdu<ARP>();
-    auto*  icmp = pdu->find_pdu<ICMP>();
+void Interface::processPDU(PDU* pdu) {
 
-    processARP(arp);
-    processPING(icmp);
+    auto* arp = pdu->find_pdu<ARP>();
+    auto* icmp = pdu->find_pdu<ICMP>();
+
+    if (arp != nullptr)
+        processARP(arp);
+
+    if (icmp != nullptr)
+        processPING(icmp);
 }
 
 void Interface::sendARPreply(ARP* request) {
@@ -99,36 +91,16 @@ void Interface::processARP(ARP *arp) {
     }
 }
 
-void Interface::sendPING(IPv4Address targetIP) {
+void Interface::sendPINGrequest(IPv4Address targetIP) {
     PacketSender sender;
 
-    ICMP echo;
-    echo.type(ICMP::ECHO_REQUEST);
+    auto* echo = new ICMP;
+    echo->type(ICMP::ECHO_REQUEST);
 
-    IP ip(targetIP, *this->ipv4);
-    sendPacket(&ip);
-//
-//    HWAddress<6> *targetMAC = this->arp_table->findRecord(targetIP);
-//
-//    for (int i = 0; i < 5; ++i) {
-//        if (targetMAC == nullptr){
-//            sendARPrequest(targetIP);
-//            sleep(1);
-//            targetMAC = this->arp_table->findRecord(targetIP);
-//        } else
-//            break;
-//    }
-//
-//    if (targetMAC == nullptr){
-//        QMessageBox messageBox;
-//        messageBox.critical(nullptr,"Error","Destination unreachable\t");
-//        return;
-//    }
-//
-//    EthernetII eth(*targetMAC, this->interface->hw_address());
-//    eth = eth / ip / echo;
-//
-//    eth.send(sender, *this->interface);
+    auto* ip = new IP(targetIP, *this->ipv4);
+    *ip /= *echo;
+
+    auto future = QtConcurrent::run(this, &Interface::sendPacket, ip);
 }
 
 void Interface::processPING(ICMP *icmp) {
@@ -158,14 +130,9 @@ void Interface::sendPINGreply(PDU *pdu) {
     auto* ip_request = pdu->find_pdu<IP>();
     auto* ip_reply = new IP(ip_request->src_addr(), ip_request->dst_addr());
 
-//    auto* eth_request = pdu->find_pdu<EthernetII>();
-//    auto* eth_reply = new EthernetII(eth_request->src_addr(), this->interface->hw_address());
-//
-//    *eth_reply = *eth_reply / *ip_reply / *reply;
-//
-//    PacketSender sender;
-//    sender.send(*eth_reply, *this->interface);
-    sendPacket(ip_reply);
+    *ip_reply /= *reply;
+
+    auto future = QtConcurrent::run(this, &Interface::sendPacket, ip_reply);
 }
 
 void Interface::sendPacket(IP* ip) {
@@ -173,7 +140,7 @@ void Interface::sendPacket(IP* ip) {
 
     HWAddress<6> *targetMAC = this->arp_table->findRecord(ip->dst_addr());
 
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 3; ++i) {
         if (targetMAC == nullptr){
             sendARPrequest(ip->dst_addr());
             sleep(1);

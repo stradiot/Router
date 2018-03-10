@@ -56,7 +56,7 @@ void Gui::on_pushButton_clicked() {
         string ip = ui->lineEdit->text().toStdString();
         string mask = ui->lineEdit_2->text().toStdString();
 
-        this->one->setIPv4(interface, ip, mask);
+        one->setIPv4(interface, ip, mask);
 
         ui->pushButton_6->setDisabled(false);
     }
@@ -71,7 +71,7 @@ void Gui::on_pushButton_2_clicked() {
         string ip = ui->lineEdit_3->text().toStdString();
         string mask = ui->lineEdit_4->text().toStdString();
 
-        this->two->setIPv4(interface, ip, mask);
+        two->setIPv4(interface, ip, mask);
     }
 }
 
@@ -81,22 +81,27 @@ void Gui::on_pushButton_3_clicked() {
         messageBox.critical(nullptr,"Error","Setup interfaces first");
         return;
     }
-    this->one->setStop(false);
-    this->two->setStop(false);
+
+    this->arp_table->set_stop(false);
+
+    this->arp_table->start();
 
     this->one->start();
     this->two->start();
 
-    this->arp_table->set_stop(false);
-    this->arp_table->start();
     ui->pushButton_4->setDisabled(false);
+    ui->pushButton->setDisabled(true);
+    ui->pushButton_2->setDisabled(true);
     ui->pushButton_3->setDisabled(true);
 }
 
 void Gui::on_pushButton_4_clicked() {
-    this->one->setStop(true);
-    this->two->setStop(true);
-    this->arp_table->set_stop(true);
+    one->terminate();
+    two->terminate();
+    arp_table->set_stop(true);
+
+    ui->pushButton->setDisabled(false);
+    ui->pushButton_2->setDisabled(false);
     ui->pushButton_3->setDisabled(false);
     ui->pushButton_4->setDisabled(true);
 }
@@ -107,14 +112,18 @@ void Gui::onARPprint(QStringList list) {
 }
 
 void Gui::on_pushButton_5_clicked() {
-    this->one->setStop(true);
-    this->two->setStop(true);
-    this->arp_table->set_stop(true);
+    if (one->isRunning())
+        one->terminate();
+    if (two->isRunning())
+        two->terminate();
+
+    arp_table->set_stop(true);
+
     exit(0);
 }
 
 void Gui::on_pushButton_6_clicked() {
-    this->one->sendPING(ui->lineEdit_5->text().toStdString());
+    this->one->sendPINGrequest(ui->lineEdit_5->text().toStdString());
 }
 
 void Gui::on_spinBox_valueChanged(int i) {
