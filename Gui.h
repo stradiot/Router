@@ -5,6 +5,7 @@
 #include <QtCore/QStringListModel>
 #include "ARP_table.h"
 #include "Interface.h"
+#include "Routing_table.h"
 
 namespace Ui {
     class Gui;
@@ -22,10 +23,12 @@ private:
     Ui::Gui *ui;
 
     ARP_table* arp_table;
+    Routing_table* routing_table;
     Interface* one;
     Interface* two;
 
-    QStringListModel* model;
+    QStringListModel* ARPmodel;
+    QStringListModel* ROUTEmodel;
 
 private slots:
     void on_pushButton_clicked();
@@ -35,10 +38,14 @@ private slots:
     void on_pushButton_5_clicked();
     void on_pushButton_6_clicked();
     void on_pushButton_7_clicked();
+    void on_pushButton_8_clicked();
+    void on_pushButton_9_clicked();
+    void on_pushButton_10_clicked();
     void on_spinBox_valueChanged(int i);
 
 public slots:
     void onARPprint(QStringList list);
+    void onROUTEprint(QStringList list);
 
 };
 

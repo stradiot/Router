@@ -5,9 +5,8 @@
 using namespace Tins;
 
 int main(int argc, char *argv[]) {
-//    qputenv("XDG_RUNTIME_DIR", "/tmp/runtime-root");
-
     auto* a = new QApplication(argc, argv);
+    a->setStyle("Plastique");
     Gui w;
     w.show();
     a->exec();

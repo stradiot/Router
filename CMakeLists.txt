@@ -12,7 +12,7 @@ find_package(Qt5Core REQUIRED)
 find_package(Qt5Widgets REQUIRED)
 find_package(Qt5Gui REQUIRED)
 
-add_executable(Router main.cpp Interface.cpp Interface.h Gui.cpp Gui.h ui_Gui.h ARP_table.cpp ARP_table.h ARP_record.h ARP_record.cpp)
+add_executable(Router main.cpp Interface.cpp Interface.h Gui.cpp Gui.h ui_Gui.h ARP_table.cpp ARP_table.h ARP_record.h ARP_record.cpp Routing_table.cpp Routing_table.h Routing_table_record.h)
 
 target_link_libraries(Router tins ${Boost_LIBRARIES} Qt5::Core Qt5::Widgets Qt5::Gui pcap)
 
