@@ -22,7 +22,6 @@ Gui::Gui(QWidget *parent) :
     for (auto &entry : interfaces){
         ui->comboBox->addItem(QString::fromStdString(entry.name()));
         ui->comboBox_2->addItem(QString::fromStdString(entry.name()));
-        ui->comboBox_3->addItem(QString::fromStdString(entry.name()));
     }
 
     ui->comboBox_3->addItem("none");
@@ -76,7 +75,10 @@ void Gui::on_pushButton_clicked() {
 
         routing_table->deleteRecord("C", one->getInterface());
 
-        one->setIPv4(interface, ip, mask);
+        ui->comboBox_3->clear();
+        ui->comboBox_3->addItem("none");
+        ui->comboBox_3->addItem(QString::fromStdString(interface));
+        ui->comboBox_3->addItem(QString::fromStdString(two->getInterface()));
 
         IPv4Address netmask = IPv4Address::from_prefix_length(static_cast<uint32_t>(stoi(mask)));
         IPv4Address network = IPv4Address(ip).operator&(netmask);
@@ -89,6 +91,8 @@ void Gui::on_pushButton_clicked() {
         record->administrativeDistance = 0;
 
         routing_table->addRecord(record);
+
+        one->setIPv4(interface, ip, mask);
 
         ui->pushButton_6->setDisabled(false);
     }
@@ -105,6 +109,11 @@ void Gui::on_pushButton_2_clicked() {
 
         routing_table->deleteRecord("C", two->getInterface());
 
+        ui->comboBox_3->clear();
+        ui->comboBox_3->addItem("none");
+        ui->comboBox_3->addItem(QString::fromStdString(interface));
+        ui->comboBox_3->addItem(QString::fromStdString(one->getInterface()));
+
         IPv4Address netmask = IPv4Address::from_prefix_length(static_cast<uint32_t>(stoi(mask)));
         IPv4Address network = IPv4Address(ip).operator&(netmask);
 
@@ -118,6 +127,8 @@ void Gui::on_pushButton_2_clicked() {
         routing_table->addRecord(record);
 
         two->setIPv4(interface, ip, mask);
+
+        ui->pushButton_6->setDisabled(false);
     }
 }
 
@@ -232,8 +243,14 @@ void Gui::onROUTEprint(QStringList list) {
 
 void Gui::on_pushButton_8_clicked() {
     auto* record = new Routing_table_record;
-    record->network = ui->lineEdit_6->text().toStdString();
-    record->netmask = (unsigned int) (std::stoi(ui->lineEdit_7->text().toStdString()));
+    unsigned int mask = (unsigned int) (std::stoi(ui->lineEdit_7->text().toStdString()));
+
+    IPv4Address netmask = IPv4Address::from_prefix_length(mask);
+    IPv4Address network = ui->lineEdit_6->text().toStdString();
+    network = network & netmask;
+
+    record->network = network;
+    record->netmask = mask;
     record->administrativeDistance = 1;
     record->protocol = "S";
     if (!ui->lineEdit_8->text().isEmpty())
