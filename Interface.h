@@ -39,12 +39,14 @@ private:
 
     Interface* otherInterface  = nullptr;
 
+    int calculate_prefix_length (uint32_t address);
     void sendARPreply(ARP* request);
     void processARP(ARP* arp);
     void processPING(ICMP* icmp);
     void sendPINGreply(PDU* pdu);
     void forwardPacket(IP* ip);
-    void processRIPv2(UDP* udp);
+    void processRIPv2(IP* ip);
+    void processRIPv2Response(IP* ip);
 };
 
 

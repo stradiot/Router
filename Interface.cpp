@@ -15,7 +15,7 @@ void Interface::run() {
                 auto *ip = pdu->find_pdu<IP>();
                 if (ip != nullptr) {
                     if (ip->dst_addr() == "224.0.0.9"){
-                        processRIPv2(udp);
+                        processRIPv2(ip);
                         continue;
                     }
                 }
@@ -46,23 +46,77 @@ void Interface::run() {
 }
 
 
-void Interface::processRIPv2(UDP *udp) {
-    RawPDU *raw = udp->find_pdu<RawPDU>();
+void Interface::processRIPv2(IP* ip) {
+    auto *raw = ip->find_pdu<RawPDU>();
 
     unsigned long payloadSize = raw->payload_size();
-    cout << payloadSize << endl;
 
     stringstream command;
     stringstream version;
     command << hex << (int)(raw->payload().at(0));
     version << hex << (int)(raw->payload().at(1));
 
+    if (version.str() != "2")
+        return;
+
     if (command.str() == "2")
-        cout << "command: response" << endl;
-    if (version.str() == "2")
-        cout << "version 2" << endl;
+        processRIPv2Response(ip);
 
 
+}
+
+void Interface::processRIPv2Response(IP *ip) {
+    auto *raw = ip->find_pdu<RawPDU>();
+    unsigned long payloadSize = raw->payload_size();
+    unsigned long network_count = (payloadSize - 4) / 20;
+
+    for (int i = 0; i < network_count; ++i) {
+        int cursor = 4 + i * 20 + 4;
+
+        stringstream network_string;
+
+        for (int j = 0; j < 3; ++j) {
+            network_string << (int)(raw->payload().at(cursor++)) <<  ".";
+        }
+        network_string << (int)(raw->payload().at(cursor++));
+
+        stringstream netmask_string;
+
+        for (int j = 0; j < 3; ++j) {
+            netmask_string << (int)(raw->payload().at(cursor++)) <<  ".";
+        }
+        netmask_string << (int)(raw->payload().at(cursor++));
+
+        stringstream nexthop_string;
+
+        for (int j = 0; j < 3; ++j) {
+            nexthop_string << (int)(raw->payload().at(cursor++)) <<  ".";
+        }
+        nexthop_string << (int)(raw->payload().at(cursor++));
+
+        auto *record = new Routing_table_record;
+        record->network = network_string.str();
+        IPv4Address netmask(netmask_string.str());
+        record->netmask = (unsigned int)calculate_prefix_length(netmask);
+        if (nexthop_string.str() == "0.0.0.0")
+            record->nextHop = ip->src_addr();
+        else
+            record->nextHop = nexthop_string.str();
+        record->protocol = "R";
+        record->administrativeDistance = 120;
+        record->interface = this->interface->name();
+
+        routing_table->addRecord(record);
+    }
+}
+
+
+int Interface::calculate_prefix_length (uint32_t address) {
+    int set_bits;
+    for (set_bits = 0; address; address >>= 1) {
+        set_bits += address & 1;
+    }
+    return set_bits;
 }
 
 Interface::Interface(ARP_table* arp_table, Routing_table* routing_table) {
@@ -285,9 +339,3 @@ void Interface::forwardPacket(IP* ip) {
 
 
 }
-
-
-
-
-
-

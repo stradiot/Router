@@ -16,7 +16,7 @@ void Routing_table::addRecord(Routing_table_record *record) {
         this->records.append(*record);
     else {
         auto old = records.at(index);
-        if (old.administrativeDistance >= record->administrativeDistance) {
+        if (old.administrativeDistance > record->administrativeDistance) {
             records.removeAt(index);
             records.append(*record);
         }
