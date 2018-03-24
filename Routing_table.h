@@ -13,6 +13,7 @@ public:
     Routing_table_record* findRecord(IPv4Address dest);
     void deleteRecord(int index);
     void deleteRecord(std::string protocol, std::string interface);
+    void deleteRecord(IPv4Address network, unsigned int prefix_length, std::string protocol);
     void clear();
     void print();
 private:

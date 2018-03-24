@@ -4,6 +4,7 @@
 #include <tins/tins.h>
 #include "ARP_table.h"
 #include "Routing_table.h"
+#include "RIPv2_database.h"
 
 using namespace Tins;
 using namespace std;
@@ -12,8 +13,11 @@ class Interface : public QThread{
     Q_OBJECT
 
 public:
-    explicit Interface(ARP_table* arp_table, Routing_table* routing_table);
-    void setIPv4(string interface, string ipv4, string mask);
+    IPv4Address* ipv4  = nullptr;
+    unsigned int netmask;
+
+    explicit Interface(ARP_table* arp_table, Routing_table* routing_table, RIPv2_database* ripv2_database);
+    void setIPv4(string interface, string ipv4, string mask, bool use_RIPv2);
     void setOtherInterface(Interface* interface);
 
     string getInterface();
@@ -28,9 +32,6 @@ public:
 private:
     NetworkInterface* interface = nullptr;
 
-    IPv4Address* ipv4  = nullptr;
-    unsigned int netmask;
-
     Routing_table* routing_table  = nullptr;
     ARP_table* arp_table  = nullptr;
 
@@ -38,6 +39,9 @@ private:
     Sniffer* sniffer  = nullptr;
 
     Interface* otherInterface  = nullptr;
+
+    bool use_RIPv2 = false;
+    RIPv2_database* ripv2_database = nullptr;
 
     int calculate_prefix_length (uint32_t address);
     void sendARPreply(ARP* request);

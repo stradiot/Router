@@ -96,6 +96,19 @@ void Routing_table::deleteRecord(std::string protocol, std::string interface) {
 
     for (int i : indexes)
         records.removeAt(i);
+}
 
+void Routing_table::deleteRecord(IPv4Address network, unsigned int prefix_length, std::string protocol) {
+    int index = -1;
+    int recordCount = records.count();
 
+    for (int i = 0; i < recordCount; ++i) {
+        auto act = records.at(i);
+        if (act.protocol == protocol && act.network == network && act.netmask == prefix_length)
+            index = i;
+    }
+
+    if (index != -1)
+        records.removeAt(index);
+    print();
 }

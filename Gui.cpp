@@ -42,21 +42,28 @@ Gui::Gui(QWidget *parent) :
     ROUTEmodel = new QStringListModel(this);
     ui->listView_2->setModel(ROUTEmodel);
 
+    RIPv2model = new QStringListModel(this);
+    ui->listView_3->setModel(RIPv2model);
+
     routing_table = new Routing_table;
 
     arp_table = new ARP_table(this);
     arp_table->start();
 
-    one = new Interface(arp_table, routing_table);
-    two = new Interface(arp_table, routing_table);
+    ripv2_database = new RIPv2_database(this);
+    ripv2_database->routing_table = this->routing_table;
+
+    one = new Interface(arp_table, routing_table, ripv2_database);
+    two = new Interface(arp_table, routing_table, ripv2_database);
 
     one->setOtherInterface(two);
     two->setOtherInterface(one);
 
+    ripv2_database->start();
+
     connect(arp_table, SIGNAL(printTable(QStringList)), this, SLOT(onARPprint(QStringList)));
     connect(routing_table, SIGNAL(printTable(QStringList)), this, SLOT(onROUTEprint(QStringList)));
-
-    routing_table->print();
+    connect(ripv2_database, SIGNAL(print_database(QStringList)), this, SLOT(onRIPv2print(QStringList)));
 }
 
 Gui::~Gui()
@@ -81,7 +88,7 @@ void Gui::on_pushButton_clicked() {
         ui->comboBox_3->addItem(QString::fromStdString(two->getInterface()));
 
         IPv4Address netmask = IPv4Address::from_prefix_length(static_cast<uint32_t>(stoi(mask)));
-        IPv4Address network = IPv4Address(ip).operator&(netmask);
+        IPv4Address network = IPv4Address(ip) & netmask;
 
         auto* record = new Routing_table_record;
         record->network = network.to_string();
@@ -92,7 +99,9 @@ void Gui::on_pushButton_clicked() {
 
         routing_table->addRecord(record);
 
-        one->setIPv4(interface, ip, mask);
+        bool use_RIPv2 = ui->checkBox->isChecked();
+
+        one->setIPv4(interface, ip, mask, use_RIPv2);
 
         ui->pushButton_6->setDisabled(false);
     }
@@ -115,7 +124,7 @@ void Gui::on_pushButton_2_clicked() {
         ui->comboBox_3->addItem(QString::fromStdString(one->getInterface()));
 
         IPv4Address netmask = IPv4Address::from_prefix_length(static_cast<uint32_t>(stoi(mask)));
-        IPv4Address network = IPv4Address(ip).operator&(netmask);
+        IPv4Address network = IPv4Address(ip) & netmask;
 
         auto* record = new Routing_table_record;
         record->network = network.to_string();
@@ -126,7 +135,8 @@ void Gui::on_pushButton_2_clicked() {
 
         routing_table->addRecord(record);
 
-        two->setIPv4(interface, ip, mask);
+        bool use_RIPv2 = ui->checkBox_2->isChecked();
+        two->setIPv4(interface, ip, mask, use_RIPv2);
 
         ui->pushButton_6->setDisabled(false);
     }
@@ -267,4 +277,9 @@ void Gui::on_pushButton_9_clicked() {
 void Gui::on_pushButton_10_clicked() {
     int index = stoi(ui->lineEdit_9->text().toStdString());
     routing_table->deleteRecord(index);
+}
+
+void Gui::onRIPv2print(QStringList list) {
+    this->RIPv2model->removeRows(0, this->RIPv2model->rowCount());
+    this->RIPv2model->setStringList(list);
 }

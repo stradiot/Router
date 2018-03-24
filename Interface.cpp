@@ -1,5 +1,6 @@
 #include <iostream>
 #include "Interface.h"
+#include "RIPv2_record.h"
 #include <QtWidgets/QMessageBox>
 #include <QtConcurrent/QtConcurrent>
 #include <iomanip>
@@ -9,14 +10,16 @@ void Interface::run() {
     while (true){
         PDU* pdu = sniffer->next_packet();
 
-        auto* udp = pdu->find_pdu<UDP>();
-        if (udp != nullptr) {
-            if (udp->dport() == 520) {
-                auto *ip = pdu->find_pdu<IP>();
-                if (ip != nullptr) {
-                    if (ip->dst_addr() == "224.0.0.9"){
-                        processRIPv2(ip);
-                        continue;
+        if (this->use_RIPv2 == true){
+            auto* udp = pdu->find_pdu<UDP>();
+            if (udp != nullptr) {
+                if (udp->dport() == 520) {
+                    auto *ip = pdu->find_pdu<IP>();
+                    if (ip != nullptr) {
+                        if (ip->dst_addr() == "224.0.0.9"){
+                            processRIPv2(ip);
+                            continue;
+                        }
                     }
                 }
             }
@@ -49,8 +52,6 @@ void Interface::run() {
 void Interface::processRIPv2(IP* ip) {
     auto *raw = ip->find_pdu<RawPDU>();
 
-    unsigned long payloadSize = raw->payload_size();
-
     stringstream command;
     stringstream version;
     command << hex << (int)(raw->payload().at(0));
@@ -61,7 +62,6 @@ void Interface::processRIPv2(IP* ip) {
 
     if (command.str() == "2")
         processRIPv2Response(ip);
-
 
 }
 
@@ -94,19 +94,30 @@ void Interface::processRIPv2Response(IP *ip) {
         }
         nexthop_string << (int)(raw->payload().at(cursor++));
 
-        auto *record = new Routing_table_record;
-        record->network = network_string.str();
-        IPv4Address netmask(netmask_string.str());
-        record->netmask = (unsigned int)calculate_prefix_length(netmask);
-        if (nexthop_string.str() == "0.0.0.0")
-            record->nextHop = ip->src_addr();
-        else
-            record->nextHop = nexthop_string.str();
-        record->protocol = "R";
-        record->administrativeDistance = 120;
-        record->interface = this->interface->name();
+        stringstream metric_string;
 
-        routing_table->addRecord(record);
+        for (int j = 0; j < 3; ++j) {
+            metric_string << (int)(raw->payload().at(cursor++));
+        }
+        metric_string << (int)(raw->payload().at(cursor++));
+
+        unsigned int metric = (unsigned int)stoi(metric_string.str());
+
+        auto *rip_record = new RIPv2_record;
+        rip_record->network = network_string.str();
+        IPv4Address rip_prefix_length = netmask_string.str();
+        rip_record->prefix_length = (unsigned int)calculate_prefix_length(rip_prefix_length);
+        rip_record->interface = this->interface->name();
+        if (nexthop_string.str() == "0.0.0.0")
+            rip_record->next_hop = ip->src_addr();
+        else
+            rip_record->next_hop = nexthop_string.str();
+        rip_record->metric = metric;
+        rip_record->timer_invalid = ripv2_database->timer_invalid;
+        rip_record->timer_holddown = ripv2_database->timer_holddown;
+        rip_record->timer_flush = ripv2_database->timer_flush;
+
+        ripv2_database->processRecord(rip_record);
     }
 }
 
@@ -119,16 +130,17 @@ int Interface::calculate_prefix_length (uint32_t address) {
     return set_bits;
 }
 
-Interface::Interface(ARP_table* arp_table, Routing_table* routing_table) {
+Interface::Interface(ARP_table* arp_table, Routing_table* routing_table, RIPv2_database* ripv2_database) {
     this->config.set_promisc_mode(true);
     this->config.set_immediate_mode(true);
     this->config.set_direction(PCAP_D_IN);
 
     this->arp_table = arp_table;
     this->routing_table = routing_table;
+    this->ripv2_database = ripv2_database;
 }
 
-void Interface::setIPv4(string interface, string ipv4, string mask) {
+void Interface::setIPv4(string interface, string ipv4, string mask, bool use_RIPv2) {
     delete this->ipv4;
     delete this->sniffer;
 
@@ -138,6 +150,8 @@ void Interface::setIPv4(string interface, string ipv4, string mask) {
     this->interface = new NetworkInterface(interface);
 
     this->sniffer = new Sniffer(interface, this->config);
+
+    this->use_RIPv2 = use_RIPv2;
 }
 
 void Interface::setOtherInterface(Interface *interface) {

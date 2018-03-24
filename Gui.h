@@ -24,11 +24,14 @@ private:
 
     ARP_table* arp_table;
     Routing_table* routing_table;
+    RIPv2_database* ripv2_database;
+
     Interface* one;
     Interface* two;
 
     QStringListModel* ARPmodel;
     QStringListModel* ROUTEmodel;
+    QStringListModel* RIPv2model;
 
 private slots:
     void on_pushButton_clicked();
@@ -46,6 +49,7 @@ private slots:
 public slots:
     void onARPprint(QStringList list);
     void onROUTEprint(QStringList list);
+    void onRIPv2print(QStringList list);
 
 };
 
