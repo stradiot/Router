@@ -35,6 +35,8 @@ Gui::Gui(QWidget *parent) :
 
     ui->pushButton_6->setDisabled(true);
     ui->pushButton_4->setDisabled(true);
+    ui->checkBox->setDisabled(true);
+    ui->checkBox_2->setDisabled(true);
 
     ARPmodel = new QStringListModel(this);
     ui->listView->setModel(ARPmodel);
@@ -64,6 +66,12 @@ Gui::Gui(QWidget *parent) :
     connect(arp_table, SIGNAL(printTable(QStringList)), this, SLOT(onARPprint(QStringList)));
     connect(routing_table, SIGNAL(printTable(QStringList)), this, SLOT(onROUTEprint(QStringList)));
     connect(ripv2_database, SIGNAL(print_database(QStringList)), this, SLOT(onRIPv2print(QStringList)));
+    connect(ui->checkBox, SIGNAL(toggled(bool)), one, SLOT(onUseRipv2(bool)));
+    connect(ui->checkBox_2, SIGNAL(toggled(bool)), two, SLOT(onUseRipv2(bool)));
+    connect(ui->spinBox_2, SIGNAL(valueChanged(int)), ripv2_database, SLOT(set_timerUpdate(int)));
+    connect(ui->spinBox_4, SIGNAL(valueChanged(int)), ripv2_database, SLOT(set_timerInvalid(int)));
+    connect(ui->spinBox_5, SIGNAL(valueChanged(int)), ripv2_database, SLOT(set_timerHolddown(int)));
+    connect(ui->spinBox_6, SIGNAL(valueChanged(int)), ripv2_database, SLOT(set_timerFlush(int)));
 }
 
 Gui::~Gui()
@@ -96,12 +104,15 @@ void Gui::on_pushButton_clicked() {
         record->protocol = "C";
         record->interface = interface;
         record->administrativeDistance = 0;
+        record->metric = 0;
 
         routing_table->addRecord(record);
 
-        bool use_RIPv2 = ui->checkBox->isChecked();
+        ripv2_database->connected_one = network;
+        ripv2_database->interface_one = interface;
+        ripv2_database->address_one = ip;
 
-        one->setIPv4(interface, ip, mask, use_RIPv2);
+        one->setIPv4(interface, ip, mask);
 
         ui->pushButton_6->setDisabled(false);
     }
@@ -132,11 +143,15 @@ void Gui::on_pushButton_2_clicked() {
         record->protocol = "C";
         record->interface = interface;
         record->administrativeDistance = 0;
+        record->metric = 0;
 
         routing_table->addRecord(record);
 
-        bool use_RIPv2 = ui->checkBox_2->isChecked();
-        two->setIPv4(interface, ip, mask, use_RIPv2);
+        ripv2_database->connected_two = network;
+        ripv2_database->interface_two = interface;
+        ripv2_database->address_two = ip;
+
+        two->setIPv4(interface, ip, mask);
 
         ui->pushButton_6->setDisabled(false);
     }
@@ -160,6 +175,8 @@ void Gui::on_pushButton_3_clicked() {
     ui->pushButton->setDisabled(true);
     ui->pushButton_2->setDisabled(true);
     ui->pushButton_3->setDisabled(true);
+    ui->checkBox->setDisabled(false);
+    ui->checkBox_2->setDisabled(false);
 
     ui->comboBox_3->addItem(QString::fromStdString(one->getInterface()));
     ui->comboBox_3->addItem(QString::fromStdString(two->getInterface()));
@@ -262,6 +279,7 @@ void Gui::on_pushButton_8_clicked() {
     record->network = network;
     record->netmask = mask;
     record->administrativeDistance = 1;
+    record->metric = 0;
     record->protocol = "S";
     if (!ui->lineEdit_8->text().isEmpty())
         record->nextHop = ui->lineEdit_8->text().toStdString();

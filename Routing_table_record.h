@@ -11,6 +11,7 @@ public:
     IPv4Address network;
     unsigned int netmask;
     unsigned int administrativeDistance;
+    unsigned int metric;
     std::string interface;
     IPv4Address nextHop;
 };

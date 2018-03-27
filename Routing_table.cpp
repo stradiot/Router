@@ -36,6 +36,7 @@ void Routing_table::print() {
         QString network = QString::fromStdString(act.network.to_string());
         QString mask = QString::number(act.netmask);
         QString ad = QString::number(act.administrativeDistance);
+        QString metric = QString::number(act.metric);
         QString nextHop = QString::fromStdString(act.nextHop.to_string());
         if (nextHop == "0.0.0.0")
             nextHop = "";
@@ -43,7 +44,7 @@ void Routing_table::print() {
         if (interface == "none")
             interface = "";
 
-        QString record = QString::number(i) +  "\t     "  + protocol + "\t" + network + "/" + mask + "\t " + ad + "\t" + nextHop + "\t" + interface;
+        QString record = QString::number(i) +  "\t     "  + protocol + "\t" + network + "/" + mask + "\t " + ad + "/" + metric + "\t" + nextHop + "\t" + interface;
 
         list << record;
     }
@@ -84,8 +85,8 @@ void Routing_table::deleteRecord(int index) {
     print();
 }
 
-void Routing_table::deleteRecord(std::string protocol, std::string interface) {
-    std::vector<int> indexes;
+void Routing_table::deleteRecord(string protocol, string interface) {
+    vector<int> indexes;
 
     int recordCount = records.count();
     for (int i = 0; i < recordCount; ++i) {
@@ -98,7 +99,7 @@ void Routing_table::deleteRecord(std::string protocol, std::string interface) {
         records.removeAt(i);
 }
 
-void Routing_table::deleteRecord(IPv4Address network, unsigned int prefix_length, std::string protocol) {
+void Routing_table::deleteRecord(IPv4Address network, unsigned int prefix_length, string protocol) {
     int index = -1;
     int recordCount = records.count();
 
@@ -111,4 +112,17 @@ void Routing_table::deleteRecord(IPv4Address network, unsigned int prefix_length
     if (index != -1)
         records.removeAt(index);
     print();
+}
+
+vector<Routing_table_record> Routing_table::fillUpdate(string interface) {
+    vector<Routing_table_record> vec;
+
+    int recordCount = records.count();
+    for (int i = 0; i < recordCount; ++i) {
+        auto act = records.at(i);
+        if ((act.protocol == "C" || act.protocol == "R") && (act.interface == interface))
+            vec.push_back(act);
+    }
+
+    return vec;
 }

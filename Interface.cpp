@@ -5,6 +5,7 @@
 #include <QtConcurrent/QtConcurrent>
 #include <iomanip>
 #include <sstream>
+#include <boost/asio/ip/address_v4.hpp>
 
 void Interface::run() {
     while (true){
@@ -41,10 +42,19 @@ void Interface::run() {
                 }
             }
         }
+
         auto* ip = pdu->find_pdu<IP>();
-        if (ip != nullptr)
-            if (ip->ttl() > 1)
-                forwardPacket(ip);
+        if (ip != nullptr){
+            if (ip->dst_addr() == *this->ipv4){
+                auto* udp = pdu->find_pdu<UDP>();
+                if (udp != nullptr)
+                    if (udp->dport() == 520)
+                        processRIPv2(ip);
+            } else {
+                if (ip->ttl() > 1)
+                    forwardPacket(ip);
+            }
+        }
     }
 }
 
@@ -62,7 +72,11 @@ void Interface::processRIPv2(IP* ip) {
 
     if (command.str() == "2")
         processRIPv2Response(ip);
-
+    else if (command.str() == "1"){
+        auto *eth = ip->parent_pdu()->find_pdu<EthernetII>();
+        if (eth != nullptr)
+            processRIPv2Request(eth);
+    }
 }
 
 void Interface::processRIPv2Response(IP *ip) {
@@ -112,7 +126,7 @@ void Interface::processRIPv2Response(IP *ip) {
             rip_record->next_hop = ip->src_addr();
         else
             rip_record->next_hop = nexthop_string.str();
-        rip_record->metric = metric;
+        rip_record->metric = min(metric + 1, (unsigned int)16);
         rip_record->timer_invalid = ripv2_database->timer_invalid;
         rip_record->timer_holddown = ripv2_database->timer_holddown;
         rip_record->timer_flush = ripv2_database->timer_flush;
@@ -140,7 +154,7 @@ Interface::Interface(ARP_table* arp_table, Routing_table* routing_table, RIPv2_d
     this->ripv2_database = ripv2_database;
 }
 
-void Interface::setIPv4(string interface, string ipv4, string mask, bool use_RIPv2) {
+void Interface::setIPv4(string interface, string ipv4, string mask) {
     delete this->ipv4;
     delete this->sniffer;
 
@@ -151,7 +165,8 @@ void Interface::setIPv4(string interface, string ipv4, string mask, bool use_RIP
 
     this->sniffer = new Sniffer(interface, this->config);
 
-    this->use_RIPv2 = use_RIPv2;
+    if (use_RIPv2)
+        ripv2_database->sendRequest(interface);
 }
 
 void Interface::setOtherInterface(Interface *interface) {
@@ -164,7 +179,6 @@ string Interface::getInterface() {
     else
         return this->interface->name();
 }
-
 
 void Interface::sendARPrequest(IPv4Address targetIP) {
     EthernetII request;
@@ -352,4 +366,90 @@ void Interface::forwardPacket(IP* ip) {
 
 
 
+}
+
+void Interface::onUseRipv2(bool value) {
+    this->use_RIPv2 = value;
+
+    ripv2_database->sendRequest(this->interface->name());
+}
+
+void Interface::processRIPv2Request(EthernetII *eth_pdu) {
+    IP *ip_pdu = eth_pdu->find_pdu<IP>();
+    if (ip_pdu == nullptr)
+        return;
+
+    auto vec = routing_table->fillUpdate(otherInterface->interface->name());
+    vector<RIPv2_record> vec_rec;
+
+    for (auto rec : vec){
+        RIPv2_record record;
+        record.network = rec.network;
+        record.prefix_length = rec.netmask;
+        record.metric = rec.metric;
+
+        vec_rec.push_back(record);
+    }
+
+    for (auto rec : ripv2_database->records) {
+        if (rec->metric == 16 && rec->interface == otherInterface->interface->name())
+            vec_rec.push_back(*rec);
+    }
+
+    while (!vec_rec.empty()){
+        vector<uint8_t> payload{
+                0x02, 0x02, 0x00,0x00
+        };
+
+        vector<uint8_t> header{
+                0x00, 0x02, 0x00, 0x00
+        };
+
+        for (int k = 0; k < 25; ++k) {
+            auto record = vec_rec.back();
+            vec_rec.pop_back();
+
+            IPv4Address network = record.network;
+            array<uint8_t, 4> arr_net = boost::asio::ip::address_v4::from_string(network.to_string()).to_bytes();
+            vector<uint8_t> vec_net(arr_net.begin(), arr_net.end());
+
+            IPv4Address netmask = IPv4Address::from_prefix_length(record.prefix_length);
+            array<uint8_t, 4> arr_mask = boost::asio::ip::address_v4::from_string(netmask.to_string()).to_bytes();
+            vector<uint8_t> vec_mask(arr_mask.begin(), arr_mask.end());
+
+            vector<uint8_t> vec_nh{
+                    0x00, 0x00,  0x00, 0x00
+            };
+
+            int metric = min(record.metric, (unsigned int)16);
+            vector<uint8_t> vec_metric;
+
+            for (int j = 0; j < 4; ++j) {
+                vec_metric.push_back(metric & 0xFF);
+                metric >>= 8;
+            }
+
+            reverse(vec_metric.begin(), vec_metric.end());
+
+            payload.insert(payload.end(), header.begin(), header.end());
+            payload.insert(payload.end(), vec_net.begin(), vec_net.end());
+            payload.insert(payload.end(), vec_mask.begin(), vec_mask.end());
+            payload.insert(payload.end(), vec_nh.begin(), vec_nh.end());
+            payload.insert(payload.end(), vec_metric.begin(), vec_metric.end());
+
+            if (vec_rec.empty())
+                break;
+        }
+
+        RawPDU raw(payload.begin(), payload.end());
+        UDP udp(520, 520);
+        IP ip(ip_pdu->src_addr(), ipv4->to_string());
+        ip.ttl(255);
+        EthernetII eth(eth_pdu->src_addr(), this->interface->hw_address());
+
+        eth /= ip / udp / raw;
+
+        PacketSender sender(*this->interface);
+        sender.send(eth);
+    }
 }

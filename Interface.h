@@ -17,7 +17,7 @@ public:
     unsigned int netmask;
 
     explicit Interface(ARP_table* arp_table, Routing_table* routing_table, RIPv2_database* ripv2_database);
-    void setIPv4(string interface, string ipv4, string mask, bool use_RIPv2);
+    void setIPv4(string interface, string ipv4, string mask);
     void setOtherInterface(Interface* interface);
 
     string getInterface();
@@ -51,6 +51,10 @@ private:
     void forwardPacket(IP* ip);
     void processRIPv2(IP* ip);
     void processRIPv2Response(IP* ip);
+    void processRIPv2Request(EthernetII *eth_pdu);
+
+public slots:
+    void onUseRipv2(bool value);
 };
 
 

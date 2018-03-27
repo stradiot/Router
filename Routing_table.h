@@ -6,14 +6,17 @@
 #include "Routing_table_record.h"
 #include <QObject>
 
+using namespace std;
+
 class Routing_table : public QObject{
     Q_OBJECT
 public:
     void addRecord(Routing_table_record* record);
     Routing_table_record* findRecord(IPv4Address dest);
+    vector<Routing_table_record> fillUpdate(string interface);
     void deleteRecord(int index);
-    void deleteRecord(std::string protocol, std::string interface);
-    void deleteRecord(IPv4Address network, unsigned int prefix_length, std::string protocol);
+    void deleteRecord(string protocol, string interface);
+    void deleteRecord(IPv4Address network, unsigned int prefix_length, string protocol);
     void clear();
     void print();
 private:

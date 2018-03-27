@@ -14,11 +14,12 @@ public:
     string interface;
     unsigned int metric;
 
-    unsigned int timer_invalid = 180;
-    unsigned int timer_holddown = 180;
-    unsigned int timer_flush = 240;
+    unsigned int timer_invalid;
+    unsigned int timer_holddown;
+    unsigned int timer_flush;
 
     bool possibly_down = false;
+
 };
 
 
