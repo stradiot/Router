@@ -49,8 +49,10 @@ private slots:
 public slots:
     void onARPprint(QStringList list);
     void onROUTEprint(QStringList list);
-    void onRIPv2print(QStringList list);
-
+    void onRIPv2print(QStringList list, unsigned int);
+    void onStatisticsChanged();
+    void onSuccessfulPING();
+    void onUnreachable();
 };
 
 #endif // GUI_H

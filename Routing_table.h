@@ -14,19 +14,17 @@ public:
     void addRecord(Routing_table_record* record);
     Routing_table_record* findRecord(IPv4Address dest);
     vector<Routing_table_record> fillUpdate(string interface);
-    void deleteRecord(int index);
+    void deleteRecord(unsigned long index);
     void deleteRecord(string protocol, string interface);
-    void deleteRecord(IPv4Address network, unsigned int prefix_length, string protocol);
+    void deleteRecord(IPv4Address network, unsigned int prefix_length, IPv4Address nexthop, string protocol);
     void clear();
     void print();
 private:
-    QList<Routing_table_record> records;
+    vector<Routing_table_record*> records;
 
 signals:
     void printTable(QStringList list);
-
-
-
+    void findReplacement(IPv4Address network, unsigned int prefix_length);
 };
 
 

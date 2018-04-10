@@ -1,11 +1,12 @@
 #ifndef ROUTER_ARP_TABLE_H
 #define ROUTER_ARP_TABLE_H
 
-
 #include <QtCore/QThread>
 #include <QtCore/QMutex>
 #include <mutex>
 #include "ARP_record.h"
+
+using namespace std;
 
 class ARP_table : public QThread{
     Q_OBJECT
@@ -22,7 +23,7 @@ public:
     void clear();
 
 private:
-    QList<ARP_record> records;
+    vector<ARP_record*> records;
     bool stop = false;
     unsigned int timer = 20;
     std::mutex mutex;

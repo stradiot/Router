@@ -1,29 +1,28 @@
 #include <iostream>
 #include "Interface.h"
-#include "RIPv2_record.h"
 #include <QtWidgets/QMessageBox>
 #include <QtConcurrent/QtConcurrent>
 #include <iomanip>
 #include <sstream>
 #include <boost/asio/ip/address_v4.hpp>
+#include <thread>
 
 void Interface::run() {
     while (true){
         PDU* pdu = sniffer->next_packet();
+        count_statistics_IN(pdu);
 
-        if (this->use_RIPv2 == true){
+        if (use_RIPv2){
             auto* udp = pdu->find_pdu<UDP>();
-            if (udp != nullptr) {
-                if (udp->dport() == 520) {
+            if (udp != nullptr)
+                if (udp->dport() == 520){
                     auto *ip = pdu->find_pdu<IP>();
-                    if (ip != nullptr) {
+                    if (ip != nullptr)
                         if (ip->dst_addr() == "224.0.0.9"){
                             processRIPv2(ip);
                             continue;
                         }
-                    }
                 }
-            }
         }
 
         auto* arp = pdu->find_pdu<ARP>();
@@ -35,29 +34,25 @@ void Interface::run() {
         auto* icmp = pdu->find_pdu<ICMP>();
         if (icmp != nullptr){
             auto* ip = pdu->find_pdu<IP>();
-            if (ip != nullptr){
+            if (ip != nullptr)
                 if ((ip->dst_addr() == this->ipv4->to_string()) || (ip->dst_addr() == otherInterface->ipv4->to_string())){
                     processPING(icmp);
                     continue;
                 }
-            }
         }
 
         auto* ip = pdu->find_pdu<IP>();
-        if (ip != nullptr){
+        if (ip != nullptr)
             if (ip->dst_addr() == *this->ipv4){
                 auto* udp = pdu->find_pdu<UDP>();
                 if (udp != nullptr)
                     if (udp->dport() == 520)
                         processRIPv2(ip);
-            } else {
+            } else
                 if (ip->ttl() > 1)
                     forwardPacket(ip);
-            }
-        }
     }
 }
-
 
 void Interface::processRIPv2(IP* ip) {
     auto *raw = ip->find_pdu<RawPDU>();
@@ -113,7 +108,7 @@ void Interface::processRIPv2Response(IP *ip) {
         for (int j = 0; j < 3; ++j) {
             metric_string << (int)(raw->payload().at(cursor++));
         }
-        metric_string << (int)(raw->payload().at(cursor++));
+        metric_string << (int)(raw->payload().at(cursor));
 
         unsigned int metric = (unsigned int)stoi(metric_string.str());
 
@@ -135,7 +130,6 @@ void Interface::processRIPv2Response(IP *ip) {
     }
 }
 
-
 int Interface::calculate_prefix_length (uint32_t address) {
     int set_bits;
     for (set_bits = 0; address; address >>= 1) {
@@ -154,12 +148,12 @@ Interface::Interface(ARP_table* arp_table, Routing_table* routing_table, RIPv2_d
     this->ripv2_database = ripv2_database;
 }
 
-void Interface::setIPv4(string interface, string ipv4, string mask) {
+void Interface::setIPv4(string interface, string ipv4, unsigned int mask) {
     delete this->ipv4;
     delete this->sniffer;
 
     this->ipv4 = new IPv4Address(ipv4);
-    this->netmask = (unsigned int)std::stoi(mask);
+    this->prefix_length = mask;
 
     this->interface = new NetworkInterface(interface);
 
@@ -186,6 +180,10 @@ void Interface::sendARPrequest(IPv4Address targetIP) {
 
     PacketSender sender;
     sender.send(request, *this->interface);
+
+    statistics_out.EthernetII++;
+    statistics_out.ARP_REQ++;
+    emit statistics_changed();
 }
 
 void Interface::sendARPreply(ARP* request) {
@@ -195,6 +193,10 @@ void Interface::sendARPreply(ARP* request) {
 
     PacketSender sender;
     sender.send(reply, *this->interface);
+
+    statistics_out.EthernetII++;
+    statistics_out.ARP_REP++;
+    emit statistics_changed();
 }
 
 void Interface::processARP(ARP *arp) {
@@ -276,8 +278,7 @@ void Interface::processPING(ICMP *icmp) {
 
     if ((ip->dst_addr() == this->ipv4->to_string()) || (ip->dst_addr() == otherInterface->ipv4->to_string())){
         if (icmp->type() == ICMP::ECHO_REPLY){
-            QMessageBox messageBox;
-            messageBox.information(nullptr, "PING", "Ping successful");
+            emit successful_PING();
         } else if (icmp->type() == ICMP::ECHO_REQUEST){
             sendPINGreply(pdu);
         }
@@ -292,24 +293,29 @@ void Interface::sendPacket(IP* ip, IPv4Address* nextHop) {
     else
         dest = *nextHop;
 
-    HWAddress<6> *targetMAC = this->arp_table->findRecord(dest);
+    HWAddress<6> *targetMAC = arp_table->findRecord(dest);
 
     for (int i = 0; i < 3; ++i) {
         if (targetMAC == nullptr){
             sendARPrequest(dest);
-            sleep(1);
-            targetMAC = this->arp_table->findRecord(dest);
-        } else
-            break;
+            msleep(50);
+            targetMAC = arp_table->findRecord(dest);
+            if (targetMAC != nullptr)
+                break;
+            else
+                sleep(1);
+        }
     }
 
     if (targetMAC == nullptr){
+        emit unreachable();
         return;
     }
 
     EthernetII eth(*targetMAC, this->interface->hw_address());
     eth = eth / *ip;
 
+    count_statistics_OUT(&eth);
     eth.send(sender, *this->interface);
 }
 
@@ -363,19 +369,17 @@ void Interface::forwardPacket(IP* ip) {
         }
     }
     catch (...){}
-
-
-
 }
 
 void Interface::onUseRipv2(bool value) {
     this->use_RIPv2 = value;
 
-    ripv2_database->sendRequest(this->interface->name());
+    if (value)
+        ripv2_database->sendRequest(this->interface->name());
 }
 
 void Interface::processRIPv2Request(EthernetII *eth_pdu) {
-    IP *ip_pdu = eth_pdu->find_pdu<IP>();
+    auto *ip_pdu = eth_pdu->find_pdu<IP>();
     if (ip_pdu == nullptr)
         return;
 
@@ -450,6 +454,96 @@ void Interface::processRIPv2Request(EthernetII *eth_pdu) {
         eth /= ip / udp / raw;
 
         PacketSender sender(*this->interface);
+        count_statistics_OUT(&eth);
         sender.send(eth);
     }
+}
+
+void Interface::count_statistics_IN(PDU *pdu) {
+    auto *eth = pdu->find_pdu<EthernetII>();
+    if (eth != nullptr)
+        this->statistics_in.EthernetII++;
+    else
+        return;
+
+    auto *arp = pdu->find_pdu<ARP>();
+    if (arp != nullptr)
+        if (arp->opcode() == ARP::REQUEST)
+            this->statistics_in.ARP_REQ++;
+        else
+            this->statistics_in.ARP_REP++;
+
+    auto *ip = pdu->find_pdu<IP>();
+    if (ip != nullptr)
+        this->statistics_in.IP++;
+
+    auto *icmp = pdu->find_pdu<ICMP>();
+    if (icmp != nullptr)
+        if (icmp->type() == ICMP::ECHO_REQUEST)
+            this->statistics_in.ICMP_REQ++;
+        else
+            this->statistics_in.ICMP_REP++;
+
+    auto *udp = pdu->find_pdu<UDP>();
+    if (udp != nullptr){
+        this->statistics_in.UDP++;
+
+        if (udp->dport() == 520){
+            auto *raw = udp->find_pdu<RawPDU>();
+
+            stringstream command;
+            stringstream version;
+            command << hex << (int)(raw->payload().at(0));
+            version << hex << (int)(raw->payload().at(1));
+
+            if (version.str() == "2")
+                if (command.str() == "1")
+                    this->statistics_in.RIPv2_REQ++;
+                else
+                    this->statistics_in.RIPv2_REP++;
+        }
+    }
+
+    emit statistics_changed();
+}
+
+void Interface::count_statistics_OUT(PDU *pdu) {
+    auto *eth = pdu->find_pdu<EthernetII>();
+    if (eth != nullptr)
+        this->statistics_out.EthernetII++;
+    else
+        return;
+
+    auto *ip = pdu->find_pdu<IP>();
+    if (ip != nullptr)
+        this->statistics_out.IP++;
+
+    auto *icmp = pdu->find_pdu<ICMP>();
+    if (icmp != nullptr)
+        if (icmp->type() == ICMP::ECHO_REQUEST)
+            this->statistics_out.ICMP_REQ++;
+        else
+            this->statistics_out.ICMP_REP++;
+
+    auto *udp = pdu->find_pdu<UDP>();
+    if (udp != nullptr){
+        this->statistics_out.UDP++;
+
+        if (udp->dport() == 520){
+            auto *raw = udp->find_pdu<RawPDU>();
+
+            stringstream command;
+            stringstream version;
+            command << hex << (int)(raw->payload().at(0));
+            version << hex << (int)(raw->payload().at(1));
+
+            if (version.str() == "2")
+                if (command.str() == "1")
+                    this->statistics_out.RIPv2_REQ++;
+                else
+                    this->statistics_out.RIPv2_REP++;
+        }
+    }
+
+    emit statistics_changed();
 }

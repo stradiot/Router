@@ -5,43 +5,48 @@
 
 void RIPv2_database::run() {
     while (1){
-        if (update == 0){
-            sendUpdate(interface_one);
-            sendUpdate(interface_two);
-            update = timer_update;
-        }
-
-        int recordCount = records.count();
-        vector<int> delete_indexes;
-
-        for (int i = 0; i < recordCount; ++i) {
+        for (int i = 0; i < records.count(); ++i) {
             auto act = records.at(i);
 
             if (act->possibly_down){
                 if (act->timer_flush == 0 || act->timer_holddown == 0){
-                    routing_table->deleteRecord(act->network, act->prefix_length, "R");
-                    delete_indexes.push_back(i);
+                    routing_table->deleteRecord(act->network, act->prefix_length, act->next_hop, "R");
+                    records.removeAt(i--);
                 } else {
-                    records[i]->timer_holddown--;
-                    records[i]->timer_flush--;
+                    act->timer_holddown--;
+                    act->timer_flush--;
                 }
             } else {
                 if (act->timer_invalid == 0){
-                    records[i]->possibly_down = true;
-                    records[i]->metric = 16;
+                    act->possibly_down = true;
+                    act->metric = 16;
+                    routing_table->deleteRecord(act->network, act->prefix_length, act->next_hop, "R");
+
+                    findBestRoute(act);
+
+                    Routing_table_record record;
+                    record.interface = act->interface;
+                    record.network = act->network;
+                    record.netmask = act->prefix_length;
+                    record.metric = act->metric;
+                    record.protocol = "R";
+                    record.administrativeDistance = 120;
+                    record.nextHop = act->next_hop;
+
+                    routing_table->addRecord(&record);
                 } else {
-                    records[i]->timer_invalid--;
-                    records[i]->timer_flush--;
+                    act->timer_invalid--;
+                    act->timer_flush--;
                 }
             }
         }
 
-        if (!delete_indexes.empty()){
-            for (auto i : delete_indexes)
-                records.removeAt(i);
-        }
-
         update--;
+        if (update == 0){
+            sendUpdate(one->getInterface());
+            sendUpdate(two->getInterface());
+            update = timer_update;
+        }
         print();
         sleep(1);
     }
@@ -49,9 +54,8 @@ void RIPv2_database::run() {
 
 void RIPv2_database::processRecord(RIPv2_record *record) {
     std::unique_lock<std::mutex> guard(mutex);
-
-    int index = -1;
-    int recordCount = records.count();
+    IPv4Address connected_one = *one->ipv4 & IPv4Address::from_prefix_length(one->prefix_length);
+    IPv4Address connected_two = *two->ipv4 & IPv4Address::from_prefix_length(two->prefix_length);
 
     if (record->network == connected_one || record->network == connected_two)
         return;
@@ -61,26 +65,27 @@ void RIPv2_database::processRecord(RIPv2_record *record) {
         return;
     }
 
-    for (int i = 0; i < recordCount; ++i) {
+    RIPv2_record* rec = nullptr;
+    for (int i = 0; i < records.count(); ++i) {
         auto act = records.at(i);
 
         if (act->network == record->network && act->prefix_length == record->prefix_length && act->next_hop == record->next_hop){
-            index = i;
+            rec = act;
             break;
         }
     }
 
-    if (index == -1){
+    if (rec == nullptr){
         records.append(record);
     } else {
-        if (records[index]->possibly_down){
+        if (rec->possibly_down){
             print();
             guard.unlock();
             return;
         }
-        records[index]->metric = record->metric;
-        records[index]->timer_invalid = this->timer_invalid;
-        records[index]->timer_flush = this->timer_flush;
+        rec->metric = record->metric;
+        rec->timer_invalid = this->timer_invalid;
+        rec->timer_flush = this->timer_flush;
     }
 
     findBestRoute(record);
@@ -91,19 +96,17 @@ void RIPv2_database::processRecord(RIPv2_record *record) {
 }
 
 void RIPv2_database::solvePossiblyDown(RIPv2_record *record) {
-    int index = -1;
-    int recordCount = records.count();
-
-    for (int i = 0; i < recordCount; ++i) {
+    RIPv2_record* rec = nullptr;
+    for (int i = 0; i < records.count(); ++i) {
         auto act = records.at(i);
 
         if (act->network == record->network && act->prefix_length == record->prefix_length && act->next_hop == record->next_hop){
-            index = i;
+            rec = act;
             break;
         }
     }
 
-    if (index == -1) {
+    if (rec == nullptr){
         record->possibly_down = true;
         record->timer_invalid = 0;
         record->timer_holddown = this->timer_holddown;
@@ -111,10 +114,10 @@ void RIPv2_database::solvePossiblyDown(RIPv2_record *record) {
 
         sendTriggeredUpdate(record);
         records.append(record);
-    } else if (!records[index]->possibly_down){
-        records[index]->metric = 16;
-        records[index]->possibly_down = true;
-        records[index]->timer_invalid = 0;
+    } else if (!rec->possibly_down){
+        rec->metric = 16;
+        rec->possibly_down = true;
+        rec->timer_invalid = 0;
 
         sendTriggeredUpdate(record);
         findBestRoute(record);
@@ -125,11 +128,11 @@ void RIPv2_database::solvePossiblyDown(RIPv2_record *record) {
 
 
 void RIPv2_database::findBestRoute(RIPv2_record *record) {
-    auto rec = routing_table->findRecord(record->network);
+    auto RIPv2record = routing_table->findRecord(record->network);
 
-    if (rec != nullptr){
-        if (record->metric < rec->metric || record->metric == 16){
-            routing_table->deleteRecord(rec->network, rec->netmask, "R");
+    if (RIPv2record != nullptr){
+        if (record->metric < RIPv2record->metric || record->metric == 16){
+            routing_table->deleteRecord(RIPv2record->network, RIPv2record->netmask, RIPv2record->nextHop, "R");
         }
     }
 
@@ -158,7 +161,6 @@ void RIPv2_database::findBestRoute(RIPv2_record *record) {
 void RIPv2_database::print() {
     QStringList list;
 
-    list << "update in: " + QString::number(update) << "";
     int recordCount = records.count();
     for (int i = 0; i < recordCount; ++i) {
         auto act = records.at(i);
@@ -185,7 +187,7 @@ void RIPv2_database::print() {
         list << record;
     }
 
-    emit print_database(list);
+    emit print_database(list, update);
 }
 
 RIPv2_database::RIPv2_database(QObject *parent) : QThread(parent) {
@@ -227,26 +229,26 @@ void RIPv2_database::sendTriggeredUpdate(RIPv2_record *record) {
     HWAddress<6> add("01:00:5E:00:00:09");
     eth.dst_addr(add);
 
-    if (record->interface == interface_one){
-        ip.src_addr(address_two);
+    if (record->interface == one->getInterface()){
+        ip.src_addr(two->ipv4->to_string());
 
         eth /= ip / udp / raw;
 
-        PacketSender sender(interface_two);
+        PacketSender sender(two->getInterface());
         sender.send(eth);
+        two->count_statistics_OUT(&eth);
     } else {
-        ip.src_addr(address_one);
+        ip.src_addr(one->ipv4->to_string());
 
         eth /= ip / udp / raw;
 
-        PacketSender sender(interface_one);
+        PacketSender sender(one->getInterface());
         sender.send(eth);
+        one->count_statistics_OUT(&eth);
     }
 }
 
 void RIPv2_database::sendUpdate(string interface) {
-    unique_lock<std::mutex> guard(mutex);
-
     auto vec = routing_table->fillUpdate(interface);
     vector<RIPv2_record> vec_rec;
 
@@ -318,24 +320,28 @@ void RIPv2_database::sendUpdate(string interface) {
         HWAddress<6> add("01:00:5E:00:00:09");
         eth.dst_addr(add);
 
-        if (interface == interface_one){
-            ip.src_addr(address_two);
+        if (interface == one->getInterface()){
+            if (!ripv2_two)
+                return;
+            ip.src_addr(two->ipv4->to_string());
 
             eth /= ip / udp / raw;
 
-            PacketSender sender(interface_two);
+            PacketSender sender(two->getInterface());
             sender.send(eth);
+            two->count_statistics_OUT(&eth);
         } else {
-            ip.src_addr(address_one);
+            if (!ripv2_one)
+                return;
+            ip.src_addr(one->ipv4->to_string());
 
             eth /= ip / udp / raw;
 
-            PacketSender sender(interface_one);
+            PacketSender sender(one->getInterface());
             sender.send(eth);
+            one->count_statistics_OUT(&eth);
         }
     }
-
-    guard.unlock();
 }
 
 void RIPv2_database::sendRequest(string interface) {
@@ -354,20 +360,22 @@ void RIPv2_database::sendRequest(string interface) {
     HWAddress<6> add("01:00:5E:00:00:09");
     eth.dst_addr(add);
 
-    if (interface == interface_one){
-        ip.src_addr(address_one);
+    if (interface == one->getInterface()){
+        ip.src_addr(one->ipv4->to_string());
 
         eth /= ip / udp / raw;
 
-        PacketSender sender(interface_one);
+        PacketSender sender(one->getInterface());
         sender.send(eth);
+        one->count_statistics_OUT(&eth);
     } else {
-        ip.src_addr(address_two);
+        ip.src_addr(two->ipv4->to_string());
 
         eth /= ip / udp / raw;
 
-        PacketSender sender(interface_two);
+        PacketSender sender(two->getInterface());
         sender.send(eth);
+        two->count_statistics_OUT(&eth);
     }
 }
 
@@ -385,4 +393,38 @@ void RIPv2_database::set_timerHolddown(int holddown) {
 
 void RIPv2_database::set_timerFlush(int flush) {
     this->timer_flush = (unsigned int)flush;
+}
+
+void RIPv2_database::set_ripv2_one(bool use) {
+    this->ripv2_one = use;
+}
+
+void RIPv2_database::set_ripv2_two(bool use) {
+    this->ripv2_two = use;
+}
+
+void RIPv2_database::findReplacement(IPv4Address network, unsigned int prefix_length) {
+    RIPv2_record* best = nullptr;
+
+    for (int i = 0; i < records.count(); ++i) {
+        auto act = records.at(i);
+
+        if (act->network == network && act->prefix_length == prefix_length)
+            if (best == nullptr || best->metric > act->metric)
+                best = act;
+    }
+
+    if (best != nullptr){
+        auto *record = new Routing_table_record;
+
+        record->network = best->network;
+        record->netmask = best->prefix_length;
+        record->metric = best->metric;
+        record->administrativeDistance = 120;
+        record->nextHop = best->next_hop;
+        record->protocol = "R";
+        record->interface = best->interface;
+
+        routing_table->addRecord(record);
+    }
 }

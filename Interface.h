@@ -5,19 +5,24 @@
 #include "ARP_table.h"
 #include "Routing_table.h"
 #include "RIPv2_database.h"
+#include "Statistics.h"
 
 using namespace Tins;
 using namespace std;
 
+class RIPv2_database;
 class Interface : public QThread{
     Q_OBJECT
 
 public:
     IPv4Address* ipv4  = nullptr;
-    unsigned int netmask;
+    unsigned int prefix_length;
+
+    Statistics statistics_in;
+    Statistics statistics_out;
 
     explicit Interface(ARP_table* arp_table, Routing_table* routing_table, RIPv2_database* ripv2_database);
-    void setIPv4(string interface, string ipv4, string mask);
+    void setIPv4(string interface, string ipv4, unsigned int prefix_length);
     void setOtherInterface(Interface* interface);
 
     string getInterface();
@@ -28,6 +33,7 @@ public:
     void sendPINGrequest(IPv4Address targetIP);
     void sendPINGrequest(IPv4Address targetIP, IPv4Address* nextHop);
     void sendPacket(IP* ip, IPv4Address* nextHop);
+    void count_statistics_OUT(PDU *pdu);
 
 private:
     NetworkInterface* interface = nullptr;
@@ -52,6 +58,12 @@ private:
     void processRIPv2(IP* ip);
     void processRIPv2Response(IP* ip);
     void processRIPv2Request(EthernetII *eth_pdu);
+    void count_statistics_IN(PDU *pdu);
+
+signals:
+    void statistics_changed();
+    void successful_PING();
+    void unreachable();
 
 public slots:
     void onUseRipv2(bool value);

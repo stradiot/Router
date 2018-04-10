@@ -5,7 +5,10 @@
 #include <mutex>
 #include "RIPv2_record.h"
 #include "Routing_table.h"
+#include "Interface.h"
 
+
+class Interface;
 class RIPv2_database : public QThread{
     Q_OBJECT
 public:
@@ -18,12 +21,12 @@ public:
     unsigned int timer_flush = 240;
 
     Routing_table* routing_table = nullptr;
-    IPv4Address connected_one;
-    IPv4Address connected_two;
-    IPv4Address address_one;
-    IPv4Address address_two;
-    std::string interface_one;
-    std::string interface_two;
+
+    bool ripv2_one;
+    bool ripv2_two;
+
+    Interface* one;
+    Interface* two;
 
     QList<RIPv2_record*> records;
 
@@ -41,14 +44,16 @@ private:
     std::mutex mutex;
 
 signals:
-    void print_database(QStringList list);
+    void print_database(QStringList list, unsigned int update_in);
 
 public slots:
+    void findReplacement(IPv4Address network, unsigned int prefix_length);
+    void set_ripv2_one(bool use);
+    void set_ripv2_two(bool use);
     void set_timerUpdate(int update);
     void set_timerInvalid(int invalid);
     void set_timerHolddown(int holddown);
     void set_timerFlush(int flush);
-
 };
 
 

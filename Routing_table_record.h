@@ -4,15 +4,16 @@
 #include <tins/tins.h>
 
 using namespace Tins;
+using namespace std;
 
 class Routing_table_record {
 public:
-    std::string protocol;
+    string protocol;
     IPv4Address network;
     unsigned int netmask;
     unsigned int administrativeDistance;
     unsigned int metric;
-    std::string interface;
+    string interface;
     IPv4Address nextHop;
 };
 

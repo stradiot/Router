@@ -2,49 +2,41 @@
 #include "Routing_table.h"
 
 void Routing_table::addRecord(Routing_table_record *record) {
-    int index = -1;
-
-    int recordCount = records.count();
-    for (int i = 0; i < recordCount; ++i) {
+    for (unsigned long i = 0; i < records.size(); ++i) {
         auto act = records.at(i);
-        if ((act.network.to_string() == record->network.to_string()) && (act.netmask == record->netmask)){
-            index = i;
+        if ((act->network.to_string() == record->network.to_string()) && (act->netmask == record->netmask)) {
+            if (act->administrativeDistance > record->administrativeDistance) {
+                records.erase(records.begin() + i);
+                records.push_back(record);
+            }
+            print();
+            return;
         }
     }
 
-    if (index == -1)
-        this->records.append(*record);
-    else {
-        auto old = records.at(index);
-        if (old.administrativeDistance > record->administrativeDistance) {
-            records.removeAt(index);
-            records.append(*record);
-        }
-    }
-
+    records.push_back(record);
     print();
 }
 
 void Routing_table::print() {
     QStringList list;
 
-    int recordCount = records.count();
-    for (int i = 0; i < recordCount; ++i) {
+    for (unsigned long i = 0; i < records.size(); ++i) {
         auto act = records.at(i);
 
-        QString protocol = QString::fromStdString(act.protocol);
-        QString network = QString::fromStdString(act.network.to_string());
-        QString mask = QString::number(act.netmask);
-        QString ad = QString::number(act.administrativeDistance);
-        QString metric = QString::number(act.metric);
-        QString nextHop = QString::fromStdString(act.nextHop.to_string());
+        QString protocol = QString::fromStdString(act->protocol);
+        QString network = QString::fromStdString(act->network.to_string());
+        QString mask = QString::number(act->netmask);
+        QString ad = QString::number(act->administrativeDistance);
+        QString metric = QString::number(act->metric);
+        QString nextHop = QString::fromStdString(act->nextHop.to_string());
         if (nextHop == "0.0.0.0")
             nextHop = "";
-        QString interface = QString::fromStdString(act.interface);
+        QString interface = QString::fromStdString(act->interface);
         if (interface == "none")
             interface = "";
 
-        QString record = QString::number(i) +  "\t     "  + protocol + "\t" + network + "/" + mask + "\t " + ad + "/" + metric + "\t" + nextHop + "\t" + interface;
+        QString record = QString::number(i) +  "\t     "  + protocol + "\t" + network + "/" + mask + "\t [" + ad + "/" + metric + "]\t" + nextHop + "\t" + interface;
 
         list << record;
     }
@@ -58,71 +50,57 @@ void Routing_table::clear() {
 }
 
 Routing_table_record *Routing_table::findRecord(IPv4Address dest) {
-    int index = -1;
+    Routing_table_record *best = nullptr;
 
-    int recordCount = records.count();
-    for (int i = 0; i < recordCount; ++i) {
-        auto act = records.at(i);
-        IPv4Range range = act.network / act.netmask;
+    for (auto act : records) {
+        IPv4Range range = act->network / act->netmask;
 
-        if (range.contains(dest) || ((act.network == "0.0.0.0") && (act.netmask == 0))){
-            if (index == -1)
-                index = i;
+        if (range.contains(dest) || (act->network == "0.0.0.0" && act->netmask == 0)){
+            if (best == nullptr)
+                best = act;
             else
-                if (records.at(index).netmask < act.netmask)
-                    index = i;
+                if (best->netmask < act->netmask)
+                    best = act;
         }
     }
 
-    if (index == -1)
-        return nullptr;
-    else
-        return (Routing_table_record *)&records.at(index);
+    return best;
 }
 
-void Routing_table::deleteRecord(int index) {
-    records.removeAt(index);
+void Routing_table::deleteRecord(unsigned long index) {
+    auto *record = records.at(index);
+    records.erase(records.begin() + index);
+    emit findReplacement(record->network, record->netmask);
     print();
 }
 
 void Routing_table::deleteRecord(string protocol, string interface) {
-    vector<int> indexes;
-
-    int recordCount = records.count();
-    for (int i = 0; i < recordCount; ++i) {
+    for (unsigned long i = 0; i < records.size(); ++i) {
         auto act = records.at(i);
-        if ((act.protocol == protocol) && (act.interface == interface))
-            indexes.push_back(i);
+        if ((act->protocol == protocol) && (act->interface == interface))
+            records.erase(records.begin() + i--);
     }
 
-    for (int i : indexes)
-        records.removeAt(i);
-}
-
-void Routing_table::deleteRecord(IPv4Address network, unsigned int prefix_length, string protocol) {
-    int index = -1;
-    int recordCount = records.count();
-
-    for (int i = 0; i < recordCount; ++i) {
-        auto act = records.at(i);
-        if (act.protocol == protocol && act.network == network && act.netmask == prefix_length)
-            index = i;
-    }
-
-    if (index != -1)
-        records.removeAt(index);
     print();
 }
 
 vector<Routing_table_record> Routing_table::fillUpdate(string interface) {
     vector<Routing_table_record> vec;
 
-    int recordCount = records.count();
-    for (int i = 0; i < recordCount; ++i) {
-        auto act = records.at(i);
-        if ((act.protocol == "C" || act.protocol == "R") && (act.interface == interface))
-            vec.push_back(act);
+    for (auto act: records) {
+        if ((act->protocol == "C" || act->protocol == "R") && (act->interface == interface))
+            vec.push_back(*act);
     }
 
     return vec;
+}
+
+void Routing_table::deleteRecord(IPv4Address network, unsigned int prefix_length, IPv4Address nexthop, string protocol) {
+    for (unsigned long i = 0; i < records.size(); ++i) {
+        auto act = records.at(i);
+        if (act->protocol == protocol && act->network == network && act->netmask == prefix_length && act->nextHop == nexthop)
+            records.erase(records.begin() + i--);
+    }
+
+    print();
 }
