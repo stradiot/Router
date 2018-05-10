@@ -34,4 +34,4 @@ Smerovač podporuje ICMP ping oboma smermi.
 Smerovač zobrazuje štatistiky pre každé rozhranie.
 
 
-![Screenshot of GUI](/home/martin/Desktop/screenshot.png)
+![Screenshot of GUI](screenshots/screenshot.png)
