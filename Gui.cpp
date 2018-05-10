@@ -12,6 +12,7 @@ Gui::Gui(QWidget *parent) :
         ui(new Ui::Gui)
 {
     ui->setupUi(this);
+    this->setWindowTitle("Router");
 
     ui->lineEdit_2->setValidator(new QIntValidator(0, 32, this));
     ui->lineEdit_4->setValidator(new QIntValidator(0, 32, this));
@@ -84,6 +85,7 @@ Gui::Gui(QWidget *parent) :
     connect(two, SIGNAL(successful_PING()), this, SLOT(onSuccessfulPING()));
     connect(one, SIGNAL(unreachable()), this, SLOT(onUnreachable()));
     connect(two, SIGNAL(unreachable()), this, SLOT(onUnreachable()));
+
 }
 
 Gui::~Gui()

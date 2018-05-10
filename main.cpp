@@ -1,5 +1,6 @@
 #include <tins/tins.h>
 #include <QtWidgets/QApplication>
+#include <QtWidgets/QLayout>
 #include "Gui.h"
 
 using namespace Tins;
