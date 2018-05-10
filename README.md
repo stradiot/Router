@@ -14,9 +14,10 @@ Pre zabezpečenie grafického rozhrania využívam C++ framework **Qt vo verzií
 
 ## Funkcionalita
 
-Smerovač umožňuje statické aj dynamické smerovanie. Dynamické smerovanie je
-zabezpečené pomocou protokolu RIP verzie 2 a je kompatibilné s Cisco smerovačmi.
-Kombatibilita s inými smerovačmi nie je testovaná.
+Smerovač umožňuje statické aj dynamické smerovanie. Statickú cestu možno špecifikovať
+výstupným rozhraním, IP adresou next-hopu, alebo kombináciou oboch.
+Dynamické smerovanie je zabezpečené pomocou protokolu RIP verzie 2 a je kompatibilné 
+s Cisco smerovačmi. Kombatibilita s inými smerovačmi nie je testovaná.
 
 Smerovač zobrazuje RIPv2 databázu v reálnom čase, pričom časovače RIP databázy sú
 konfigurovateľné.
