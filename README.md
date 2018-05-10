@@ -32,3 +32,6 @@ podporuje ARP proxy. Časovač pre ARP záznamy je nastaviteľný.
 Smerovač podporuje ICMP ping oboma smermi.
 
 Smerovač zobrazuje štatistiky pre každé rozhranie.
+
+
+![Screenshot of GUI](/home/martin/Desktop/screenshot.png)
