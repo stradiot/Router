@@ -8,7 +8,7 @@ using namespace Tins;
 using namespace std;
 
 Gui::Gui(QWidget *parent) :
-        QMainWindow(parent),
+        QMainWindow(nullptr),
         ui(new Ui::Gui)
 {
     ui->setupUi(this);
@@ -395,5 +395,5 @@ void Gui::onSuccessfulPING() {
 
 void Gui::onUnreachable() {
     QMessageBox messageBox;
-    messageBox.critical(nullptr, "Unreachable", "Network is unreachable");
+    messageBox.critical(nullptr, "Unreachable", "Destination is unreachable");
 }

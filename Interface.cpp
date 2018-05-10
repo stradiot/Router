@@ -225,6 +225,10 @@ void Interface::processARP(ARP *arp) {
 }
 
 void Interface::sendPINGrequest(IPv4Address targetIP) {
+    if (targetIP == this->ipv4->to_string() || targetIP == this->otherInterface->ipv4->to_string()){
+        emit successful_PING();
+        return;
+    }
     auto* echo = new ICMP;
     echo->type(ICMP::ECHO_REQUEST);
 
